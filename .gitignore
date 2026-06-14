@@ -1,21 +1,30 @@
-# Environment variables and secrets
+# Environment variables
 .env
-.env.*
-!.env.example
 backend/.env
-backend/.env.*
-!backend/.env.example
 
-# Python virtual environments
+# Virtual environments
 .venv/
-venv/
-env/
 backend/.venv/
 
-# Python cache/build output
+# Local agent and Codex state
+.agents/
+.codex/
+
+# Python cache and bytecode
 __pycache__/
+**/__pycache__/
+**pycache**/
+backend/**/__pycache__/
+backend/**pycache**/
+*.pyc
 *.py[cod]
 *$py.class
+
+# Local vector databases
+backend/chroma_db/
+chroma_db/
+
+# Python tooling and build output
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
@@ -25,21 +34,14 @@ build/
 dist/
 *.egg-info/
 
-# Local vector database and generated data
-backend/chroma_db/
-chroma_db/
-
-# Streamlit local config/cache
-.streamlit/secrets.toml
+# Streamlit local secrets/cache
 .streamlit/
 
-# IDE/editor files
+# Editor and OS files
 .vscode/
 .idea/
 *.swp
 *.swo
-
-# OS files
 .DS_Store
 Thumbs.db
 
