@@ -216,7 +216,8 @@ def format_response(state: RagState) -> RagState:
             "file_path": meta["file_path"],
             "language": meta["language"],
             "chunk_no": meta["chunk_no"],
-            "distance": score
+            "distance": score,
+            "score": score
         })
 
     return {

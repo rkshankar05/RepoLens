@@ -25,6 +25,14 @@ IGNORE_PARTS = (
 )
 
 
+class GitHubLoaderError(Exception):
+    def __init__(self, message: str, code: str, status_code: int = 400):
+        super().__init__(message)
+        self.message = message
+        self.code = code
+        self.status_code = status_code
+
+
 def github_headers():
     token = os.getenv("GITHUB_TOKEN")
 
@@ -40,15 +48,78 @@ def github_headers():
 def parse_github_url(repo_url: str):
     parsed = urlparse(repo_url)
 
+    if parsed.scheme not in ("http", "https") or parsed.netloc.lower() != "github.com":
+        raise GitHubLoaderError(
+            "Enter a valid GitHub repository URL, for example https://github.com/owner/repo.",
+            "invalid_github_url",
+            400
+        )
+
     parts = parsed.path.strip("/").split("/")
 
     if len(parts) < 2:
-        raise ValueError("Invalid GitHub repository URL")
+        raise GitHubLoaderError(
+            "Enter a valid GitHub repository URL, for example https://github.com/owner/repo.",
+            "invalid_github_url",
+            400
+        )
 
     owner = parts[0]
     repo = parts[1].replace(".git", "")
 
+    if not owner or not repo:
+        raise GitHubLoaderError(
+            "Enter a valid GitHub repository URL, for example https://github.com/owner/repo.",
+            "invalid_github_url",
+            400
+        )
+
     return owner, repo
+
+
+def raise_for_github_response(response, default_message: str):
+    if response.status_code == 200:
+        return
+
+    token_configured = bool(os.getenv("GITHUB_TOKEN"))
+
+    if response.status_code == 401:
+        raise GitHubLoaderError(
+            "GitHub rejected the token. Check GITHUB_TOKEN in backend/.env.",
+            "github_token_invalid",
+            401
+        )
+
+    if response.status_code == 403:
+        remaining = response.headers.get("X-RateLimit-Remaining")
+        if remaining == "0":
+            raise GitHubLoaderError(
+                "GitHub API rate limit exceeded. Add a GITHUB_TOKEN or wait for the limit to reset.",
+                "github_rate_limit_exceeded",
+                429
+            )
+
+        raise GitHubLoaderError(
+            "GitHub denied access. If this is a private repo, add a token with repository access.",
+            "private_repo_without_token" if not token_configured else "github_access_denied",
+            403
+        )
+
+    if response.status_code == 404:
+        if token_configured:
+            message = "Repository not found, or your GitHub token cannot access it."
+            code = "repo_not_found"
+        else:
+            message = "Repository not found. If it is private, add GITHUB_TOKEN in backend/.env."
+            code = "private_repo_without_token"
+
+        raise GitHubLoaderError(message, code, 404)
+
+    raise GitHubLoaderError(
+        f"{default_message}: {response.text[:300]}",
+        "github_api_error",
+        response.status_code
+    )
 
 
 def canonical_repo_url(repo_url: str):
@@ -62,8 +133,7 @@ def get_default_branch(owner: str, repo: str):
 
     response = requests.get(url, headers=github_headers(), timeout=20)
 
-    if response.status_code != 200:
-        raise Exception(f"GitHub repo not found: {response.text}")
+    raise_for_github_response(response, "Could not fetch repository metadata")
 
     data = response.json()
 
@@ -75,12 +145,26 @@ def get_latest_commit_sha(owner: str, repo: str, branch: str):
 
     response = requests.get(url, headers=github_headers(), timeout=20)
 
-    if response.status_code != 200:
-        raise Exception(f"Could not fetch latest commit: {response.text}")
+    raise_for_github_response(response, "Could not fetch latest commit")
 
     data = response.json()
 
     return data["sha"]
+
+
+def get_repository_metadata(repo_url: str):
+    owner, repo = parse_github_url(repo_url)
+    normalized_repo_url = canonical_repo_url(repo_url)
+    branch = get_default_branch(owner, repo)
+    latest_commit_sha = get_latest_commit_sha(owner, repo, branch)
+
+    return {
+        "repo_url": normalized_repo_url,
+        "owner": owner,
+        "repo": repo,
+        "branch": branch,
+        "latest_commit_sha": latest_commit_sha
+    }
 
 
 def should_include_file(path: str):
@@ -97,8 +181,7 @@ def list_repo_files(owner: str, repo: str, branch: str):
 
     response = requests.get(url, headers=github_headers(), timeout=30)
 
-    if response.status_code != 200:
-        raise Exception(f"Could not fetch repo tree: {response.text}")
+    raise_for_github_response(response, "Could not fetch repository file tree")
 
     data = response.json()
 
@@ -151,6 +234,13 @@ def load_repository(repo_url: str):
                     "content": content
                 }
             )
+
+    if not loaded_files:
+        raise GitHubLoaderError(
+            "No supported code or text files were found in this repository.",
+            "empty_repository",
+            400
+        )
 
     return {
         "repo_url": normalized_repo_url,

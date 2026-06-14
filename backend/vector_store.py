@@ -1,10 +1,16 @@
+import os
+
+from dotenv import load_dotenv
 from langchain_chroma import Chroma
 from langchain_core.documents import Document
 
 from embeddings import embedding_collection_suffix, get_embeddings_model
 from github_loader import canonical_repo_url, parse_github_url
 
-CHROMA_PATH = "./chroma_db"
+
+load_dotenv()
+
+CHROMA_PATH = os.getenv("CHROMA_DB_DIR", "./chroma_db")
 
 
 def collection_name(owner: str, repo: str):
@@ -22,6 +28,20 @@ def get_collection(owner: str, repo: str):
 
 def collection_count(collection) -> int:
     return collection._collection.count()
+
+
+def collection_status(collection) -> dict:
+    try:
+        return {
+            "available": True,
+            "total_items": collection_count(collection)
+        }
+    except Exception as exc:
+        return {
+            "available": False,
+            "total_items": 0,
+            "error": str(exc)
+        }
 
 
 def filter_collection_results(results: dict, repo_url: str) -> dict:
