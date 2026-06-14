@@ -5,24 +5,24 @@ from fastapi import FastAPI
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel
 
-from chunker import chunk_files
-from github_loader import (
+from services.chunker import chunk_files
+from services.github_loader import (
     GitHubLoaderError,
     canonical_repo_url,
     get_repository_metadata,
     load_repository,
     parse_github_url
 )
-from index_cache import delete_cached_repo, get_cached_repo, update_cached_repo
-from ollama_llm import (
+from services.ollama_llm import (
     OLLAMA_EMBED_MODEL,
     OLLAMA_MODEL,
     check_ollama,
     model_available,
     ollama_status
 )
-from rag import answer_question, run_repo_intelligence, stream_answer
-from vector_store import (
+from services.rag import answer_question, run_repo_intelligence, stream_answer
+from storage.index_cache import delete_cached_repo, get_cached_repo, update_cached_repo
+from storage.vector_store import (
     CHROMA_PATH,
     collection_name,
     collection_status,

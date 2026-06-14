@@ -3,13 +3,13 @@ import os
 from typing import TypedDict
 
 from dotenv import load_dotenv
-from github_loader import parse_github_url
+from services.github_loader import parse_github_url
 from langchain_core.documents import Document
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_ollama import ChatOllama
 from langgraph.graph import END, StateGraph
-from prompts import INTELLIGENCE_PROMPTS, INTELLIGENCE_SYSTEM_PROMPT
-from vector_store import (
+from services.prompts import INTELLIGENCE_PROMPTS, INTELLIGENCE_SYSTEM_PROMPT
+from storage.vector_store import (
     collection_count,
     get_collection,
     get_indexed_file_paths,

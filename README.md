@@ -43,27 +43,27 @@ Streamlit UI (backend/app.py)
   v
 FastAPI Backend (backend/main.py)
   |
-  +--> GitHub Loader (github_loader.py)
+  +--> GitHub Loader (services/github_loader.py)
   |      |
   |      v
   |    GitHub API
   |
-  +--> Chunker (chunker.py)
+  +--> Chunker (services/chunker.py)
   |      |
   |      v
   |    Source code chunks
   |
-  +--> Embeddings (embeddings.py)
+  +--> Embeddings (services/embeddings.py)
   |      |
   |      v
   |    Ollama embedding model
   |
-  +--> Vector Store (vector_store.py)
+  +--> Vector Store (storage/vector_store.py)
   |      |
   |      v
   |    Local ChromaDB (backend/chroma_db/)
   |
-  +--> RAG Workflow (rag.py + LangGraph)
+  +--> RAG Workflow (services/rag.py + LangGraph)
          |
          v
        Ollama chat model
@@ -85,17 +85,24 @@ github/
 └── backend/
     ├── app.py
     ├── main.py
-    ├── rag.py
-    ├── github_loader.py
-    ├── chunker.py
-    ├── embeddings.py
-    ├── ollama_llm.py
-    ├── vector_store.py
     ├── requirements.txt
     ├── .env.example
     ├── .env
     ├── .venv/
+    ├── services/
+    │   ├── __init__.py
+    │   ├── rag.py
+    │   ├── prompts.py
+    │   ├── github_loader.py
+    │   ├── chunker.py
+    │   ├── embeddings.py
+    │   └── ollama_llm.py
+    ├── storage/
+    │   ├── __init__.py
+    │   ├── vector_store.py
+    │   └── index_cache.py
     ├── __pycache__/
+    ├── index_cache.json
     └── chroma_db/
 ```
 

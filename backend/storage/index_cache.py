@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 
-CACHE_PATH = Path(__file__).with_name("index_cache.json")
+CACHE_PATH = Path(__file__).resolve().parent.parent / "index_cache.json"
 
 
 def ensure_cache_file() -> None:

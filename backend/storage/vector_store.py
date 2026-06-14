@@ -4,8 +4,8 @@ from dotenv import load_dotenv
 from langchain_chroma import Chroma
 from langchain_core.documents import Document
 
-from embeddings import embedding_collection_suffix, get_embeddings_model
-from github_loader import canonical_repo_url, parse_github_url
+from services.embeddings import embedding_collection_suffix, get_embeddings_model
+from services.github_loader import canonical_repo_url, parse_github_url
 
 
 load_dotenv()
