@@ -21,7 +21,7 @@ from ollama_llm import (
     model_available,
     ollama_status
 )
-from rag import answer_question, stream_answer
+from rag import answer_question, run_repo_intelligence, stream_answer
 from vector_store import (
     CHROMA_PATH,
     collection_name,
@@ -164,6 +164,34 @@ def repo_index_payload(repo_url: str):
         },
         "collection": db_status
     }
+
+
+def run_intelligence_endpoint(request: RepoRequest, template_name: str, message: str):
+    try:
+        ensure_ollama_ready(require_llm=True)
+        index_data = repo_index_payload(request.repo_url)
+
+        if not index_data["indexed"]:
+            return error_response(
+                message="This repository is not indexed yet. Click Index before using Repo Intelligence.",
+                error="chroma_index_missing",
+                status_code=404
+            )
+
+        result = run_repo_intelligence(
+            repo_url=request.repo_url,
+            template_name=template_name
+        )
+
+        return success_response(
+            message,
+            result
+        )
+
+    except RuntimeError as exc:
+        return handle_runtime_error(exc)
+    except Exception as exc:
+        return handle_error(exc)
 
 
 @app.get("/")
@@ -499,3 +527,48 @@ def chat_stream(request: ChatRequest):
         return handle_runtime_error(exc)
     except Exception as exc:
         return handle_error(exc)
+
+
+@app.post("/repo-summary")
+def repo_summary(request: RepoRequest):
+    return run_intelligence_endpoint(
+        request=request,
+        template_name="repo_summary",
+        message="Repository summary generated."
+    )
+
+
+@app.post("/explain-architecture")
+def explain_architecture(request: RepoRequest):
+    return run_intelligence_endpoint(
+        request=request,
+        template_name="explain_architecture",
+        message="Architecture explanation generated."
+    )
+
+
+@app.post("/code-quality-review")
+def code_quality_review(request: RepoRequest):
+    return run_intelligence_endpoint(
+        request=request,
+        template_name="code_quality_review",
+        message="Code quality review generated."
+    )
+
+
+@app.post("/generate-readme")
+def generate_readme(request: RepoRequest):
+    return run_intelligence_endpoint(
+        request=request,
+        template_name="generate_readme",
+        message="README draft generated."
+    )
+
+
+@app.post("/interview-questions")
+def interview_questions(request: RepoRequest):
+    return run_intelligence_endpoint(
+        request=request,
+        template_name="interview_questions",
+        message="Interview questions generated."
+    )

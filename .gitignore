@@ -24,6 +24,9 @@ backend/**pycache**/
 backend/chroma_db/
 chroma_db/
 
+# Local indexing cache
+backend/index_cache.json
+
 # Python tooling and build output
 .pytest_cache/
 .mypy_cache/

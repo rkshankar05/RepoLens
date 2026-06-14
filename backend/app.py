@@ -161,6 +161,19 @@ def show_sources(sources: list[dict]) -> None:
             )
 
 
+def run_repo_intelligence(label: str, endpoint: str) -> None:
+    with st.spinner(f"{label}..."):
+        try:
+            st.session_state.intelligence_result = post_json(
+                endpoint,
+                {"repo_url": st.session_state.repo_url},
+                timeout=600
+            )
+            st.session_state.intelligence_title = label
+        except Exception as exc:
+            show_error(exc)
+
+
 if "repo_url" not in st.session_state:
     st.session_state.repo_url = ""
 
@@ -178,6 +191,12 @@ if "backend_health" not in st.session_state:
 
 if "repo_status" not in st.session_state:
     st.session_state.repo_status = load_repo_status()
+
+if "intelligence_result" not in st.session_state:
+    st.session_state.intelligence_result = None
+
+if "intelligence_title" not in st.session_state:
+    st.session_state.intelligence_title = ""
 
 
 health = st.session_state.backend_health
@@ -419,6 +438,40 @@ elif not st.session_state.repo_url:
     st.info("Enter a GitHub repository URL in the sidebar to begin.")
 elif not repo_indexed:
     st.info("Load and index the repository before starting a chat.")
+
+st.divider()
+st.subheader("Repo Intelligence")
+
+intel_disabled = not backend_connected or not st.session_state.repo_url or not repo_indexed
+intel_col_a, intel_col_b = st.columns(2)
+intel_col_c, intel_col_d = st.columns(2)
+
+with intel_col_a:
+    if st.button("Generate Repo Summary", use_container_width=True, disabled=intel_disabled):
+        run_repo_intelligence("Repo Summary", "/repo-summary")
+
+with intel_col_b:
+    if st.button("Explain Architecture", use_container_width=True, disabled=intel_disabled):
+        run_repo_intelligence("Architecture Explanation", "/explain-architecture")
+
+with intel_col_c:
+    if st.button("Review Code Quality", use_container_width=True, disabled=intel_disabled):
+        run_repo_intelligence("Code Quality Review", "/code-quality-review")
+
+with intel_col_d:
+    if st.button("Generate README", use_container_width=True, disabled=intel_disabled):
+        run_repo_intelligence("README Draft", "/generate-readme")
+
+if st.button("Generate Interview Q&A", use_container_width=True, disabled=intel_disabled):
+    run_repo_intelligence("Interview Q&A", "/interview-questions")
+
+if intel_disabled:
+    st.caption("Repo Intelligence is available after the repository is indexed.")
+
+if st.session_state.intelligence_result:
+    st.markdown(f"### {st.session_state.intelligence_title}")
+    st.markdown(st.session_state.intelligence_result.get("result", ""))
+    show_sources(st.session_state.intelligence_result.get("sources", []))
 
 for message in st.session_state.messages:
     with st.chat_message(message["role"]):
