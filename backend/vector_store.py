@@ -44,6 +44,17 @@ def collection_status(collection) -> dict:
         }
 
 
+def get_indexed_file_paths(collection: Chroma, repo_url: str) -> list[str]:
+    results = get_repo_documents(collection, repo_url)
+    file_paths = set()
+
+    for metadata in results.get("metadatas", []):
+        if metadata and metadata.get("file_path"):
+            file_paths.add(metadata["file_path"])
+
+    return sorted(file_paths)
+
+
 def filter_collection_results(results: dict, repo_url: str) -> dict:
     owner, repo = parse_github_url(repo_url)
     normalized_url = canonical_repo_url(repo_url).lower()

@@ -260,6 +260,20 @@ with st.sidebar:
     st.metric("Files", repo_status.get("file_count", 0))
     st.metric("Chunks", repo_status.get("chunk_count", 0))
 
+    indexed_files = repo_status.get("indexed_files", [])
+    if indexed_files:
+        python_files = [
+            file_path
+            for file_path in indexed_files
+            if file_path.endswith(".py")
+        ]
+        st.caption(f"Indexed files: {len(indexed_files)}")
+        st.caption(f"Python files: {len(python_files)}")
+
+        with st.expander("Indexed files", expanded=False):
+            for file_path in indexed_files:
+                st.caption(file_path)
+
     latest_commit_sha = repo_status.get("latest_commit_sha")
     if latest_commit_sha:
         st.caption(f"Latest commit: {latest_commit_sha[:12]}")
@@ -471,6 +485,11 @@ if intel_disabled:
 if st.session_state.intelligence_result:
     st.markdown(f"### {st.session_state.intelligence_title}")
     st.markdown(st.session_state.intelligence_result.get("result", ""))
+    result_files = st.session_state.intelligence_result.get("indexed_files", [])
+    if result_files:
+        with st.expander("Indexed files used for grounding", expanded=False):
+            for file_path in result_files:
+                st.caption(file_path)
     show_sources(st.session_state.intelligence_result.get("sources", []))
 
 for message in st.session_state.messages:

@@ -8,9 +8,11 @@ from langchain_core.documents import Document
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_ollama import ChatOllama
 from langgraph.graph import END, StateGraph
+from prompts import INTELLIGENCE_PROMPTS, INTELLIGENCE_SYSTEM_PROMPT
 from vector_store import (
     collection_count,
     get_collection,
+    get_indexed_file_paths,
     search_chunks
 )
 
@@ -56,124 +58,6 @@ Question:
 Answer:"""
     )
 ])
-
-INTELLIGENCE_PROMPTS = {
-    "repo_summary": {
-        "query": """
-Find repository overview evidence from README files, requirements/dependency files,
-entry points, main modules, app files, API files, UI files, loaders, vector store files,
-and configuration files.
-""",
-        "instruction": """
-Create a repository summary with these sections:
-
-## Project Purpose
-Explain what the project does.
-
-## Tech Stack
-List the frameworks, libraries, models, databases, APIs, and tools used.
-
-## Main Folders and Files
-Explain the important folders and files.
-
-## How The Project Works
-Describe the workflow from user input to final output.
-
-## Possible Improvements
-Suggest practical next improvements.
-"""
-    },
-    "explain_architecture": {
-        "query": """
-Find architecture evidence from app entry points, API routes, UI files, RAG workflow,
-data loaders, embedding setup, vector database code, and dependency files.
-""",
-        "instruction": """
-Explain the architecture with these sections:
-
-## Data Flow
-Describe how data moves through the system.
-
-## Main Modules
-Explain each important module and its responsibility.
-
-## Frontend/Backend Connection
-Explain how the UI talks to the backend.
-
-## API Flow
-Explain the main API endpoints and request/response flow.
-
-## Vector DB Flow
-Explain how documents become chunks, embeddings, and vector search results.
-"""
-    },
-    "code_quality_review": {
-        "query": """
-Find code quality evidence from core modules, API handlers, UI code, error handling,
-configuration, RAG code, loaders, vector store helpers, and dependency files.
-""",
-        "instruction": """
-Review code quality with these sections:
-
-## Strengths
-List what is implemented well.
-
-## Weaknesses
-List maintainability, reliability, or clarity issues.
-
-## Possible Bugs
-Identify likely bugs or edge cases.
-
-## Missing Error Handling
-Point out missing or incomplete error handling.
-
-## Refactoring Suggestions
-Suggest simple refactors that would improve the project.
-"""
-    },
-    "generate_readme": {
-        "query": """
-Find README-worthy evidence from README files, requirements/dependency files,
-entry points, API files, UI files, environment examples, setup code, and core modules.
-""",
-        "instruction": """
-Generate a README draft with these sections:
-
-# Project Title
-
-## Description
-
-## Features
-
-## Tech Stack
-
-## Setup
-
-## Run Commands
-
-## API Endpoints
-
-## Future Improvements
-
-## Resume Bullet
-"""
-    },
-    "interview_questions": {
-        "query": """
-Find project-specific evidence from architecture, API routes, UI code, RAG workflow,
-GitHub loading, chunking, embeddings, vector store, and Ollama integration.
-""",
-        "instruction": """
-Create 10 project-specific interview questions. For each question include:
-
-- Question
-- Simple Answer
-- Technical Explanation
-
-Focus on this repository's actual design and implementation details.
-"""
-    }
-}
 
 llm = ChatOllama(
     model=OLLAMA_MODEL,
@@ -299,6 +183,41 @@ Code/Text:
     return "\n\n---\n\n".join(context_parts)
 
 
+def format_indexed_files(file_paths: list[str]) -> str:
+    if not file_paths:
+        return "No indexed file paths found."
+
+    return "\n".join(f"- {file_path}" for file_path in file_paths)
+
+
+def search_multiple_queries(collection, queries: list[str], n_results: int = 5):
+    seen = set()
+    documents = []
+    scores = []
+
+    for query in queries:
+        for document, score in search_chunks(
+            collection=collection,
+            question=query,
+            n_results=n_results
+        ):
+            meta = document.metadata
+            key = (
+                meta.get("file_path"),
+                meta.get("chunk_no"),
+                document.page_content[:80]
+            )
+
+            if key in seen:
+                continue
+
+            seen.add(key)
+            documents.append(document)
+            scores.append(score)
+
+    return documents, scores
+
+
 def should_generate(state: RagState) -> str:
     if state.get("stop_reason"):
         return "format_response"
@@ -399,39 +318,45 @@ def answer_question(repo_url: str, question: str):
 
 def run_repo_intelligence(repo_url: str, template_name: str):
     template = INTELLIGENCE_PROMPTS[template_name]
-    state = load_collection(initial_state(repo_url, template["query"]))
+    queries = template["queries"]
+    state = load_collection(initial_state(repo_url, queries[0]))
     state = check_index(state)
 
     if state.get("stop_reason"):
         return {
             "result": state["answer"],
-            "sources": []
+            "sources": [],
+            "indexed_files": []
         }
 
-    results = search_chunks(
+    indexed_files = get_indexed_file_paths(
         collection=state["collection"],
-        question=template["query"],
-        n_results=12
+        repo_url=repo_url
     )
-    documents = [document for document, _score in results]
-    scores = [score for _document, score in results]
+    documents, scores = search_multiple_queries(
+        collection=state["collection"],
+        queries=queries,
+        n_results=5 if template_name == "code_quality_review" else 4
+    )
 
     if not documents:
         return {
-            "result": "No relevant repository chunks found.",
-            "sources": []
+            "result": "Not enough retrieved context",
+            "sources": [],
+            "indexed_files": indexed_files
         }
 
     intelligence_prompt = ChatPromptTemplate.from_messages([
         (
             "system",
-            """You are a senior Python AI engineer reviewing a GitHub repository.
-Use only the repository context provided. Be specific, practical, and beginner-friendly.
-If something is not visible in the context, say that it is not clear from the retrieved code."""
+            INTELLIGENCE_SYSTEM_PROMPT
         ),
         (
             "human",
-            """Repository Context:
+            """Indexed files:
+{indexed_files}
+
+Repository Context:
 {context}
 
 Task:
@@ -442,6 +367,7 @@ Result:"""
     ])
     chain = intelligence_prompt | llm
     response = chain.invoke({
+        "indexed_files": format_indexed_files(indexed_files),
         "context": format_context(documents),
         "instruction": template["instruction"]
     })
@@ -455,7 +381,8 @@ Result:"""
 
     return {
         "result": response.content,
-        "sources": state["sources"]
+        "sources": state["sources"],
+        "indexed_files": indexed_files
     }
 
 

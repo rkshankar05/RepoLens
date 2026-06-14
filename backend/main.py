@@ -29,6 +29,7 @@ from vector_store import (
     delete_repo_index,
     get_collection,
     get_index_status,
+    get_indexed_file_paths,
     index_chunks
 )
 
@@ -145,6 +146,7 @@ def repo_index_payload(repo_url: str):
     index_status = get_index_status(collection, repo_url)
     db_status = collection_status(collection)
     cached_repo = get_cached_repo(repo_url)
+    indexed_files = get_indexed_file_paths(collection, repo_url) if index_status["indexed"] else []
 
     return {
         "repo_url": repo_url,
@@ -154,6 +156,7 @@ def repo_index_payload(repo_url: str):
         "total_chunks": index_status["total_chunks"],
         "commit_sha": index_status["commit_sha"],
         "latest_commit_sha": cached_repo.get("latest_commit_sha") if cached_repo else index_status["commit_sha"],
+        "indexed_files": indexed_files,
         "cache": {
             "exists": cached_repo is not None,
             "up_to_date": cached_repo is not None and cached_repo.get("latest_commit_sha") == index_status["commit_sha"],
@@ -233,6 +236,7 @@ def status():
         "file_count": ACTIVE_REPO["file_count"],
         "chunk_count": ACTIVE_REPO["chunk_count"],
         "latest_commit_sha": ACTIVE_REPO["commit_sha"],
+        "indexed_files": [],
         "cache": {
             "exists": False,
             "up_to_date": False,
@@ -254,6 +258,7 @@ def status():
             data["indexed"] = index_data["indexed"]
             data["chunk_count"] = index_data["total_chunks"]
             data["latest_commit_sha"] = index_data["latest_commit_sha"]
+            data["indexed_files"] = index_data["indexed_files"]
             data["cache"] = index_data["cache"]
             data["collection"] = index_data["collection"]
             ACTIVE_REPO["indexed"] = index_data["indexed"]
