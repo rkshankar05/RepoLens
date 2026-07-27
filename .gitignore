@@ -6,9 +6,6 @@ backend/.env
 .venv/
 backend/.venv/
 
-# Local agent and Codex state
-.agents/
-.codex/
 
 # Python cache and bytecode
 __pycache__/
